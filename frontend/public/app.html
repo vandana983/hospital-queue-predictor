@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QueueSense — Hospital Wait-Time Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1416; --bg-alt:#131B1E; --card:#171F22; --line:#26312F; --text:#E7EEEC;
+    --text-dim:#9FB0AC; --accent:#3ECFC0; --accent-dim:#245852; --amber:#F0A860; --green:#7FD8A6;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',-apple-system,sans-serif; line-height:1.5;}
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif; margin:0; letter-spacing:-0.01em;}
+  .wrap{max-width:1120px; margin:0 auto; padding:0 24px;}
+  a{color:inherit;}
+
+  header{position:sticky; top:0; top:env(safe-area-inset-top,0px); background:rgba(14,20,22,0.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); z-index:20;}
+  .nav{display:flex; align-items:center; justify-content:space-between; padding:16px 24px;}
+  .logo{display:flex; align-items:center; gap:10px; font-weight:600; font-size:1.05rem;}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--accent); box-shadow:0 0 10px var(--accent);}
+  .navlinks{display:flex; gap:8px; font-size:0.9rem;}
+  .navlinks button{background:transparent; border:none; color:var(--text-dim); font:inherit; padding:8px 12px; border-radius:7px; cursor:pointer;}
+  .navlinks button.active{color:var(--text); background:var(--card);}
+  .navlinks button:hover{color:var(--text);}
+  .menu-btn{display:none; background:transparent; border:1px solid var(--line); color:var(--text); border-radius:7px; padding:8px 11px; font-size:1rem;}
+
+  .view{display:none;}
+  .view.active{display:block; animation:fadeIn 0.35s ease;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+  @keyframes fadeInUp{from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:translateY(0);}}
+  @keyframes popIn{from{opacity:0; transform:scale(0.92);} to{opacity:1; transform:scale(1);}}
+  @keyframes slideDown{from{opacity:0; transform:translateY(-10px);} to{opacity:1; transform:translateY(0);}}
+  .fade-up{animation:fadeInUp 0.5s ease both;}
+  .pop{animation:popIn 0.3s ease;}
+
+  /* Button loading spinner */
+  .btn.is-loading{color:transparent !important; pointer-events:none; position:relative;}
+  .btn.is-loading::after{
+    content:''; position:absolute; top:50%; left:50%; width:16px; height:16px;
+    margin:-8px 0 0 -8px; border:2px solid rgba(8,32,28,0.3); border-top-color:#08201C;
+    border-radius:50%; animation:spin 0.6s linear infinite;
+  }
+  .btn-ghost.is-loading::after{border:2px solid var(--line); border-top-color:var(--text);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Success checkmark */
+  .success-check{
+    width:56px; height:56px; border-radius:50%; background:var(--green); color:#08201C;
+    display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:700;
+    margin:0 auto 14px; animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  section{padding:52px 24px;}
+  .hero{padding:56px 24px 36px;}
+  .hero-grid{display:grid; grid-template-columns:1.1fr 0.9fr; gap:48px; align-items:center;}
+  .hero h1{font-size:2.5rem; line-height:1.12; max-width:520px; animation:fadeInUp 0.6s ease both;}
+  .highlight{
+    position:relative; display:inline-block;
+    background:linear-gradient(90deg, var(--accent), #7FE8DC, var(--accent));
+    background-size:200% auto;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:shimmer 3.5s linear infinite;
+  }
+  .highlight::after{
+    content:''; position:absolute; left:0; bottom:-2px; height:3px; width:0;
+    background:var(--accent); border-radius:2px;
+    animation:drawUnderline 0.5s ease forwards; animation-delay:0.65s;
+  }
+  @keyframes shimmer{to{background-position:-200% center;}}
+  @keyframes drawUnderline{to{width:100%;}}
+  @keyframes float{0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);}}
+  .hero p{color:var(--text-dim); font-size:1.03rem; max-width:440px; margin-top:14px; animation:fadeInUp 0.6s ease both; animation-delay:0.1s;}
+  .cta-row{display:flex; gap:14px; margin-top:26px; flex-wrap:wrap; animation:fadeInUp 0.6s ease both; animation-delay:0.2s;}
+  .btn{padding:13px 22px; border-radius:8px; font-weight:600; font-size:0.95rem; border:1px solid transparent; cursor:pointer; text-decoration:none; display:inline-block; font-family:inherit; transition:transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;}
+  .btn:active{transform:scale(0.96);}
+  .btn-primary{background:var(--accent); color:#08201C;}
+  .btn-primary:hover{background:#54DDCF;}
+  .btn-ghost{background:transparent; border-color:var(--line); color:var(--text);}
+  .btn-ghost:hover{border-color:var(--accent);}
+  .btn-block{width:100%;}
+
+  .monitor{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px; animation:popIn 0.5s ease, float 4s ease-in-out 0.5s infinite;}
+  .monitor-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;}
+  .live{display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--green);}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--green); animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .wait-big{font-size:3.2rem; font-weight:700; font-family:'Space Grotesk',sans-serif; transition:color 0.2s ease;}
+  .wait-label{color:var(--text-dim); font-size:0.88rem;}
+  .monitor-stats{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:22px;}
+  .stat{background:var(--bg-alt); border-radius:10px; padding:13px; text-align:center;}
+  .stat b{display:block; font-size:1.25rem; font-family:'Space Grotesk',sans-serif;}
+  .stat span{font-size:0.74rem; color:var(--text-dim);}
+
+  .section-head{max-width:560px; margin-bottom:28px;}
+  .section-head h2{font-size:1.7rem;}
+  .section-head p{color:var(--text-dim); margin-top:8px;}
+
+  .cards{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; transition:transform 0.2s ease, border-color 0.2s ease;}
+  .card:hover{transform:translateY(-4px); border-color:var(--accent);}
+  .card h3{font-size:1rem; margin-bottom:6px;}
+  .card p{color:var(--text-dim); font-size:0.87rem; margin:0;}
+  .icon{width:36px;height:36px;border-radius:9px;background:var(--accent-dim); color:var(--accent); display:flex;align-items:center;justify-content:center; margin-bottom:14px; font-size:1.05rem;}
+
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:30px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:24px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:0.82rem; color:var(--text-dim); margin-bottom:6px;}
+  .field select, .field input, .field textarea{width:100%; padding:11px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg-alt); color:var(--text); font-family:inherit; font-size:0.94rem;}
+  .field select:focus, .field input:focus, .field textarea:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  .field textarea{resize:vertical; min-height:70px;}
+  .error{color:var(--amber); font-size:0.78rem; margin-top:4px; display:none;}
+  .field.invalid input, .field.invalid select{border-color:var(--amber);}
+  .field.invalid .error{display:block;}
+
+  .result{display:flex; flex-direction:column; justify-content:center; align-items:flex-start; border-left:1px solid var(--line); padding-left:32px;}
+  .result .num{font-size:3rem; font-family:'Space Grotesk',sans-serif; font-weight:700; color:var(--accent);}
+  .result .sub{color:var(--text-dim); font-size:0.88rem; margin-top:4px;}
+  .badge{margin-top:14px; font-size:0.78rem; padding:5px 10px; border-radius:999px; background:var(--accent-dim); color:var(--accent); display:inline-block;}
+
+  /* Track queue page */
+  .track-head{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px; margin-bottom:28px;}
+  .token{font-size:0.85rem; color:var(--text-dim);}
+  .token b{color:var(--text); font-family:'Space Grotesk',sans-serif; font-size:1.1rem;}
+  .steps{display:flex; gap:0; margin:30px 0 6px;}
+  .step{flex:1; text-align:center; position:relative; font-size:0.78rem; color:var(--text-dim);}
+  .step .bar{height:4px; background:var(--line); margin-bottom:10px; border-radius:2px; transition:background 0.4s ease;}
+  .step.done .bar{background:var(--accent);}
+  .step.current .bar{background:var(--amber);}
+  .step.done, .step.current{color:var(--text);}
+  .empty-state{text-align:center; padding:40px 20px; color:var(--text-dim);}
+  .empty-state .icon{margin:0 auto 14px;}
+  .notify-banner{display:none; background:var(--accent-dim); color:var(--accent); border-radius:10px; padding:14px 16px; margin-bottom:20px; font-size:0.9rem; font-weight:600;}
+  .notify-banner.show{display:block; animation:slideDown 0.4s ease;}
+  .checkline{display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-dim); margin-bottom:18px;}
+
+  /* Admin dashboard */
+  .admin-gate{max-width:360px; margin:60px auto; text-align:center;}
+  .admin-table{width:100%; border-collapse:collapse; font-size:0.88rem;}
+  .admin-table th{text-align:left; color:var(--text-dim); font-weight:500; font-size:0.78rem; padding:10px 12px; border-bottom:1px solid var(--line);}
+  .admin-table td{padding:12px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  .admin-table tr:last-child td{border-bottom:none;}
+  .pill{font-size:0.72rem; padding:4px 9px; border-radius:999px; display:inline-block;}
+  .pill.waiting{background:var(--accent-dim); color:var(--accent);}
+  .pill.almost{background:#3a2f1a; color:var(--amber);}
+  .pill.in_consultation{background:#1c3a2c; color:var(--green);}
+  .smallbtn{padding:6px 10px; font-size:0.78rem; border-radius:6px; border:1px solid var(--line); background:var(--bg-alt); color:var(--text); cursor:pointer; margin-right:4px;}
+  .smallbtn:hover{border-color:var(--accent);}
+  .doctor-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line);}
+  .doctor-row:last-child{border-bottom:none;}
+  .switch{position:relative; width:40px; height:22px; background:var(--line); border-radius:999px; cursor:pointer; border:none;}
+  .switch.on{background:var(--accent);}
+  .switch::after{content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--text); transition:left 0.15s;}
+  .switch.on::after{left:20px;}
+  .admin-grid{display:grid; grid-template-columns:2fr 1fr; gap:20px; align-items:start;}
+  @media (max-width: 860px){ .admin-grid{grid-template-columns:1fr;} .admin-table{font-size:0.8rem;} .admin-table th:nth-child(4), .admin-table td:nth-child(4){display:none;} }
+
+  footer{border-top:1px solid var(--line); padding:26px 24px; color:var(--text-dim); font-size:0.85rem;}
+
+  @media (max-width: 860px){
+    .hero-grid{grid-template-columns:1fr;}
+    .cards{grid-template-columns:repeat(2,1fr);}
+    .grid2{grid-template-columns:1fr;}
+    .result{border-left:none; border-top:1px solid var(--line); padding-left:0; padding-top:20px;}
+    .navlinks{display:none; position:absolute; top:100%; left:0; right:0; background:var(--bg-alt); border-bottom:1px solid var(--line); flex-direction:column; padding:10px;}
+    .navlinks.open{display:flex;}
+    .menu-btn{display:block;}
+    .hero h1{font-size:2rem;}
+    header{position:sticky;}
+    .nav{position:relative;}
+  }
+  @media (max-width: 480px){
+    .cards{grid-template-columns:1fr;}
+    .monitor-stats{grid-template-columns:1fr 1fr;}
+    .steps{flex-wrap:wrap;}
+    .step{min-width:33%;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <div class="logo"><span class="dot"></span> QueueSense</div>
+    <div class="navlinks" id="navlinks">
+      <button data-view="home" class="active" onclick="showView('home')">Home</button>
+      <button data-view="register" onclick="showView('register')">Register</button>
+      <button data-view="track" onclick="showView('track')">Track queue</button>
+      <button data-view="admin" onclick="showView('admin')">Staff dashboard</button>
+    </div>
+    <button class="menu-btn" onclick="document.getElementById('navlinks').classList.toggle('open')">☰</button>
+  </div>
+</header>
+
+<!-- HOME VIEW -->
+<div id="view-home" class="view active">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <h1>Know your <span class="highlight">wait</span> before you sit down.</h1>
+        <p>QueueSense predicts how long you'll wait at a clinic or hospital, using current queue size, doctor availability, and appointment type — updated in real time.</p>
+        <div class="cta-row">
+          <button class="btn btn-primary" onclick="showView('register')">Join the queue</button>
+          <button class="btn btn-ghost" onclick="showView('track')">Track my queue</button>
+        </div>
+      </div>
+      <div class="monitor">
+        <div class="monitor-top">
+          <span style="color:var(--text-dim); font-size:0.85rem;">General Outpatient — Ward 3</span>
+          <div class="live" id="connBadge"><span class="pulse"></span> Live</div>
+        </div>
+        <div class="wait-big" id="liveWait">42 min</div>
+        <div class="wait-label">Estimated waiting time</div>
+        <div class="monitor-stats">
+          <div class="stat"><b id="qCountStat">12</b><span>In queue</span></div>
+          <div class="stat"><b>2</b><span>Doctors on</span></div>
+          <div class="stat"><b>15m</b><span>Avg. consult</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head"><h2>Estimate your wait</h2><p>A preview of the prediction model. Day 4 replaces this with a trained regression model served from the backend.</p></div>
+      <div class="panel grid2">
+        <div>
+          <div class="field"><label>Patients currently in queue</label><input type="number" id="qsize" value="12" min="0"></div>
+          <div class="field"><label>Doctors available</label><input type="number" id="doctors" value="2" min="1"></div>
+          <div class="field"><label>Appointment type</label>
+            <select id="apptType">
+              <option value="general">General consultation</option>
+              <option value="specialist">Specialist consultation</option>
+              <option value="followup">Follow-up</option>
+              <option value="emergency">Emergency</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="estimate(this)">Predict wait time</button>
+        </div>
+        <div class="result">
+          <div class="num" id="resultNum">38 min</div>
+          <div class="sub">Approximate window: <span id="resultWindow">2:10 PM – 2:25 PM</span></div>
+          <div class="badge" id="resultBadge">Based on 15 min avg. consult time</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head"><h2>What the system does</h2><p>Core features planned across the build.</p></div>
+      <div class="cards">
+        <div class="card fade-up" style="animation-delay:0.05s;"><div class="icon">◷</div><h3>Real-time tracking</h3><p>Live queue position and countdown as patients ahead are seen.</p></div>
+        <div class="card fade-up" style="animation-delay:0.15s;"><div class="icon">✚</div><h3>Emergency handling</h3><p>Urgent cases are weighted into the prediction automatically.</p></div>
+        <div class="card fade-up" style="animation-delay:0.25s;"><div class="icon">◎</div><h3>Doctor availability</h3><p>Predictions adjust as doctors go on or off duty.</p></div>
+        <div class="card fade-up" style="animation-delay:0.35s;"><div class="icon">▤</div><h3>Admin dashboard</h3><p>Staff view queue load and historical trends at a glance.</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- REGISTER VIEW -->
+<div id="view-register" class="view">
+  <section>
+    <div class="wrap" style="max-width:640px;">
+      <div class="section-head"><h2>Join the queue</h2><p>Register your visit to get a token and a live wait-time estimate.</p></div>
+      <div class="panel">
+        <div class="field" id="f-name"><label>Full name</label><input type="text" id="regName" placeholder="e.g. Ananya Rao"><div class="error">Enter your name.</div></div>
+        <div class="field" id="f-phone"><label>Phone number</label><input type="tel" id="regPhone" placeholder="10-digit mobile number"><div class="error">Enter a valid 10-digit number.</div></div>
+        <div class="field"><label>Appointment type</label>
+          <select id="regType">
+            <option value="general">General consultation</option>
+            <option value="specialist">Specialist consultation</option>
+            <option value="followup">Follow-up</option>
+            <option value="emergency">Emergency</option>
+          </select>
+        </div>
+        <div class="field"><label>Reason for visit (optional)</label><textarea id="regNotes" placeholder="Brief symptoms or reason"></textarea></div>
+        <label class="checkline"><input type="checkbox" id="regNotify" style="width:auto;" checked> Notify me in this browser when my turn is almost here</label>
+        <button class="btn btn-primary btn-block" onclick="submitRegistration(this)">Join queue &amp; get token</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- TRACK VIEW -->
+<div id="view-track" class="view">
+  <section>
+    <div class="wrap" style="max-width:760px;">
+      <div id="trackEmpty" class="panel empty-state">
+        <div class="icon" style="margin:0 auto 14px;">◷</div>
+        <h3 style="margin-bottom:8px;">No active token yet</h3>
+        <p>Register your visit to start tracking your position in the queue.</p>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="showView('register')">Register now</button>
+      </div>
+
+      <div id="trackActive" class="panel" style="display:none;">
+        <div id="successCheck" style="display:none; text-align:center; margin-bottom:10px;">
+          <div class="success-check">✓</div>
+          <p style="color:var(--green); font-weight:600; font-size:0.92rem;">You're in the queue!</p>
+        </div>
+        <div class="notify-banner" id="notifyBanner">🔔 Almost your turn — please head to the waiting area near Ward 3.</div>
+        <div class="track-head">
+          <div>
+            <div class="token">Token <b id="trackToken">#Q-014</b></div>
+            <div style="color:var(--text-dim); font-size:0.85rem; margin-top:4px;" id="trackName">Ananya Rao — General consultation</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="wait-big" id="trackWait" style="font-size:2.2rem;">28 min</div>
+            <div class="wait-label">Estimated wait</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step done"><div class="bar"></div>Registered</div>
+          <div class="step current" id="stepWaiting"><div class="bar"></div>Waiting</div>
+          <div class="step" id="stepAlmost"><div class="bar"></div>Almost your turn</div>
+          <div class="step" id="stepConsult"><div class="bar"></div>In consultation</div>
+        </div>
+        <div class="monitor-stats" style="margin-top:24px;">
+          <div class="stat"><b id="trackPos">7</b><span>Your position</span></div>
+          <div class="stat"><b id="trackAhead">6</b><span>Ahead of you</span></div>
+          <div class="stat"><b>2</b><span>Doctors on</span></div>
+        </div>
+        <button class="btn btn-ghost btn-block" style="margin-top:22px;" onclick="cancelToken()">Cancel token</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ADMIN VIEW -->
+<div id="view-admin" class="view">
+  <section>
+    <div class="wrap">
+      <div id="adminGate" class="panel admin-gate" style="max-width:400px;">
+        <div class="icon" style="margin:0 auto 16px;">🔒</div>
+        <h3 id="authTitle" style="margin-bottom:6px;">Staff Portal</h3>
+        <p id="authSubtitle" style="color:var(--text-dim); font-size:0.88rem; margin-bottom:22px;">Sign in with your hospital staff credentials to manage the live queue.</p>
+
+        <div class="field" id="f-fullName" style="text-align:left; display:none;"><label>Full name</label><input type="text" id="regFullName" placeholder="e.g. Priya Sharma"></div>
+        <div class="field" id="f-role" style="text-align:left; display:none;">
+          <label>Role</label>
+          <select id="regRole">
+            <option value="receptionist">Receptionist</option>
+            <option value="nurse">Nurse</option>
+            <option value="doctor">Doctor</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="field" style="text-align:left;"><label>Username</label><input type="text" id="adminUser" placeholder="staff.username" autocomplete="username"></div>
+        <div class="field" style="text-align:left;">
+          <label>Password</label>
+          <div style="position:relative;">
+            <input type="password" id="adminPass" placeholder="••••••••" autocomplete="current-password" style="padding-right:60px;" oninput="updatePasswordHint()">
+            <button type="button" onclick="togglePwVisibility('adminPass', this)" style="position:absolute; right:6px; top:6px; background:none; border:none; color:var(--text-dim); font-size:0.75rem; cursor:pointer; padding:5px 8px;">Show</button>
+          </div>
+          <div id="pwHint" style="font-size:0.76rem; color:var(--text-dim); margin-top:5px; display:none;"></div>
+        </div>
+        <div class="field" id="f-confirmPass" style="text-align:left; display:none;">
+          <label>Confirm password</label>
+          <input type="password" id="regConfirmPass" placeholder="••••••••" autocomplete="new-password" oninput="updatePasswordHint()">
+        </div>
+        <div id="adminError" style="color:var(--amber); font-size:0.82rem; margin-bottom:10px; display:none;"></div>
+        <button class="btn btn-primary btn-block" id="authSubmitBtn" onclick="adminLogin(this)">Sign in</button>
+        <p style="margin-top:16px; font-size:0.85rem;">
+          <a href="#" id="authToggleLink" onclick="toggleAuthMode(event)" style="color:var(--accent); text-decoration:none;">New staff? Create an account</a>
+        </p>
+      </div>
+
+      <div id="adminDashboard" style="display:none;">
+        <div class="section-head" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+          <div>
+            <h2>Staff dashboard</h2>
+            <p>Signed in as <b id="adminWhoAmI" style="color:var(--text);">staff</b> — <span id="adminRoleLabel" style="color:var(--text-dim);"></span></p>
+          </div>
+          <button class="btn btn-ghost" onclick="adminLogout()" style="white-space:nowrap;">Log out</button>
+        </div>
+        <div class="admin-grid">
+          <div class="panel">
+            <table class="admin-table">
+              <thead><tr><th>Token</th><th>Patient</th><th>Type</th><th>Wait</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="adminQueueBody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h3 style="margin-bottom:14px; font-size:0.95rem;">Doctors on duty</h3>
+            <div id="adminDoctors"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+
+
+<script>
+// Change this if your backend runs on a different host/port.
+const API_BASE = 'http://127.0.0.1:8000';
+let backendOnline = false;
+let currentToken = null;
+let adminToken = null;
+
+async function apiFetch(path, options={}, auth=false){
+  const headers = {'Content-Type':'application/json'};
+  if(auth && adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+  const res = await fetch(API_BASE + path, { headers, ...options });
+  if(!res.ok){
+    if(res.status === 401 && auth) adminSessionExpired();
+    // Surface the server's actual error message (e.g. "That username is
+    // already taken") instead of a generic one -- FastAPI returns errors
+    // as {"detail": "..."}.
+    let detail = 'API error ' + res.status;
+    try{
+      const body = await res.json();
+      if(body && body.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+    }catch(parseErr){ /* response wasn't JSON, keep the generic message */ }
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+function setConnBadge(online){
+  backendOnline = online;
+  const el = document.getElementById('connBadge');
+  const hint = document.getElementById('apiHint');
+  if(online){
+    el.style.color = 'var(--green)';
+    el.innerHTML = '<span class="pulse"></span> Live';
+    if(hint) hint.textContent = '';
+  } else {
+    el.style.color = 'var(--amber)';
+    el.innerHTML = '<span class="pulse" style="background:var(--amber);"></span> Offline demo';
+  }
+}
+
+async function pingBackend(){
+  try{
+    await apiFetch('/queue/status');
+    setConnBadge(true);
+  }catch(e){
+    setConnBadge(false);
+  }
+}
+
+// Animates a number counting up/down to its new value instead of jumping,
+// so live updates (WebSocket pushes, new predictions) feel smooth rather
+// than jarring. Cheap to run -- plain requestAnimationFrame, no library.
+function animateNumber(el, newValue, suffix=''){
+  const start = parseFloat(el.dataset.rawValue || '0') || 0;
+  if(start === newValue){ el.textContent = Math.round(newValue) + suffix; return; }
+  el.dataset.rawValue = newValue;
+  const duration = 450;
+  const startTime = performance.now();
+  function step(now){
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    const current = start + (newValue - start) * eased;
+    el.textContent = Math.round(current) + suffix;
+    if(t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function paintHomeStatus(s){
+  animateNumber(document.getElementById('liveWait'), s.estimated_wait_minutes, ' min');
+  document.getElementById('qCountStat').textContent = s.patients_waiting;
+}
+
+// Real-time queue status over WebSocket -- the server pushes an update
+// every 2s over one persistent connection, instead of the page polling
+// on a timer. Falls back to a plain HTTP fetch + auto-reconnect if the
+// socket can't connect (e.g. backend briefly restarting).
+let queueSocket = null;
+function connectQueueSocket(){
+  const wsUrl = API_BASE.replace(/^http/, 'ws') + '/ws/queue';
+  try{
+    queueSocket = new WebSocket(wsUrl);
+    queueSocket.onopen = () => setConnBadge(true);
+    queueSocket.onmessage = (evt) => {
+      paintHomeStatus(JSON.parse(evt.data));
+      setConnBadge(true);
+    };
+    queueSocket.onclose = () => { setConnBadge(false); setTimeout(connectQueueSocket, 4000); };
+    queueSocket.onerror = () => { queueSocket.close(); };
+  }catch(e){
+    setConnBadge(false);
+    setTimeout(connectQueueSocket, 4000);
+  }
+}
+
+function showView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.navlinks button').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
+  document.getElementById('navlinks').classList.remove('open');
+  window.scrollTo({top:0, behavior:'smooth'});
+  if(v === 'track' && currentToken) refreshTrack();
+  if(v === 'admin' && adminAuthed) refreshAdmin();
+}
+
+function localHeuristic(q, d, type){
+  const avgConsult = {general:15, specialist:22, followup:10, emergency:8}[type];
+  let wait = Math.round((q / d) * avgConsult);
+  if(type === 'emergency') wait = Math.max(5, Math.round(wait * 0.3));
+  return {estimated_wait_minutes: wait, avg_consult_minutes: avgConsult, model_used: 'local-fallback (backend offline)'};
+}
+
+function paintEstimate(wait, avgConsult, modelUsed){
+  animateNumber(document.getElementById('resultNum'), wait, ' min');
+  document.getElementById('resultBadge').textContent = modelUsed.includes('fallback')
+    ? 'Backend offline — showing local estimate'
+    : 'Predicted by ' + modelUsed;
+  const now = new Date();
+  const start = new Date(now.getTime() + wait*60000);
+  const end = new Date(start.getTime() + avgConsult*60000);
+  const fmt = t => t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  document.getElementById('resultWindow').textContent = fmt(start) + ' – ' + fmt(end);
+}
+
+async function estimate(btn){
+  if(btn) btn.classList.add('is-loading');
+  const q = parseFloat(document.getElementById('qsize').value) || 0;
+  const d = parseFloat(document.getElementById('doctors').value) || 1;
+  const type = document.getElementById('apptType').value;
+  try{
+    const r = await apiFetch('/predict/', {method:'POST', body: JSON.stringify({queue_size:q, doctors_available:d, appointment_type:type})});
+    paintEstimate(r.estimated_wait_minutes, r.avg_consult_minutes, r.model_used);
+    setConnBadge(true);
+  }catch(e){
+    const r = localHeuristic(q, d, type);
+    paintEstimate(r.estimated_wait_minutes, r.avg_consult_minutes, r.model_used);
+    setConnBadge(false);
+  }finally{
+    if(btn) btn.classList.remove('is-loading');
+  }
+}
+
+function validateField(id, ok){
+  const el = document.getElementById(id);
+  el.classList.toggle('invalid', !ok);
+  return ok;
+}
+
+async function submitRegistration(btn){
+  const name = document.getElementById('regName').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  const type = document.getElementById('regType').value;
+  const notes = document.getElementById('regNotes').value.trim();
+
+  const nameOk = name.length > 1;
+  const phoneOk = /^[0-9]{10}$/.test(phone);
+  validateField('f-name', nameOk);
+  validateField('f-phone', phoneOk);
+  if(!nameOk || !phoneOk) return;
+
+  if(btn) btn.classList.add('is-loading');
+  try{
+    const entry = await apiFetch('/queue/register', {method:'POST', body: JSON.stringify({
+      name, phone, appointment_type: type, notes: notes || null
+    })});
+    currentToken = entry.token;
+    hasNotified = false;
+    justRegistered = true;
+    notifyPref = document.getElementById('regNotify').checked;
+    if(notifyPref && 'Notification' in window && Notification.permission === 'default'){
+      Notification.requestPermission();
+    }
+    paintTrack(entry);
+    setConnBadge(true);
+  }catch(e){
+    alert('Could not reach the backend. Start it with "uvicorn app.main:app --reload" in the backend folder, then try again.');
+    setConnBadge(false);
+    return;
+  }finally{
+    if(btn) btn.classList.remove('is-loading');
+  }
+
+  document.getElementById('regName').value = '';
+  document.getElementById('regPhone').value = '';
+  document.getElementById('regNotes').value = '';
+  showView('track');
+}
+
+let justRegistered = false;
+
+function paintTrack(entry){
+  document.getElementById('trackToken').textContent = '#' + entry.token;
+  document.getElementById('trackName').textContent = entry.patient.name + ' — ' + entry.patient.appointment_type;
+  animateNumber(document.getElementById('trackWait'), entry.estimated_wait_minutes, ' min');
+  document.getElementById('trackPos').textContent = entry.position;
+  document.getElementById('trackAhead').textContent = Math.max(0, entry.position - 1);
+  document.getElementById('trackEmpty').style.display = 'none';
+  document.getElementById('trackActive').style.display = 'block';
+
+  const checkEl = document.getElementById('successCheck');
+  if(justRegistered){
+    checkEl.style.display = 'block';
+    justRegistered = false;
+    setTimeout(() => { checkEl.style.display = 'none'; }, 2200);
+  }
+
+  document.getElementById('stepWaiting').classList.toggle('current', entry.status === 'waiting');
+  document.getElementById('stepWaiting').classList.toggle('done', entry.status !== 'waiting');
+  document.getElementById('stepAlmost').classList.toggle('current', entry.status === 'almost');
+  document.getElementById('stepAlmost').classList.toggle('done', entry.status === 'in_consultation' || entry.status === 'done');
+  document.getElementById('stepConsult').classList.toggle('current', entry.status === 'in_consultation');
+  document.getElementById('stepConsult').classList.toggle('done', entry.status === 'done');
+
+  const banner = document.getElementById('notifyBanner');
+  const almostNow = entry.status === 'almost' || entry.status === 'in_consultation';
+  banner.classList.toggle('show', almostNow);
+  if(almostNow && !hasNotified && notifyPref){
+    maybeNotify();
+  }
+}
+
+let hasNotified = false;
+let notifyPref = false;
+function maybeNotify(){
+  hasNotified = true;
+  if('Notification' in window && Notification.permission === 'granted'){
+    new Notification('QueueSense', {body: 'Your turn is almost here — head to the waiting area.'});
+  }
+}
+
+async function refreshTrack(){
+  if(!currentToken) return;
+  try{
+    const entry = await apiFetch('/queue/track/' + currentToken);
+    paintTrack(entry);
+    setConnBadge(true);
+  }catch(e){ setConnBadge(false); }
+}
+
+async function cancelToken(){
+  if(currentToken){
+    try{ await apiFetch('/queue/cancel/' + currentToken, {method:'POST'}); }catch(e){}
+  }
+  currentToken = null;
+  document.getElementById('trackActive').style.display = 'none';
+  document.getElementById('trackEmpty').style.display = 'block';
+}
+
+let adminAuthed = false;
+let adminInterval = null;
+let authMode = 'login';
+
+function toggleAuthMode(evt){
+  evt.preventDefault();
+  authMode = authMode === 'login' ? 'register' : 'login';
+  const isRegister = authMode === 'register';
+  document.getElementById('authTitle').textContent = isRegister ? 'Create staff account' : 'Staff Portal';
+  document.getElementById('authSubtitle').textContent = isRegister
+    ? 'Set up your account in a few seconds — no invite code needed.'
+    : 'Sign in with your hospital staff credentials to manage the live queue.';
+  document.getElementById('f-fullName').style.display = isRegister ? 'block' : 'none';
+  document.getElementById('f-role').style.display = isRegister ? 'block' : 'none';
+  document.getElementById('f-confirmPass').style.display = isRegister ? 'block' : 'none';
+  document.getElementById('pwHint').style.display = isRegister ? 'block' : 'none';
+  document.getElementById('authSubmitBtn').textContent = isRegister ? 'Create account' : 'Sign in';
+  document.getElementById('authToggleLink').textContent = isRegister ? 'Already have an account? Sign in' : 'New staff? Create an account';
+  document.getElementById('adminError').style.display = 'none';
+  updatePasswordHint();
+}
+
+function togglePwVisibility(fieldId, btn){
+  const el = document.getElementById(fieldId);
+  const showing = el.type === 'text';
+  el.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? 'Show' : 'Hide';
+}
+
+function updatePasswordHint(){
+  if(authMode !== 'register') return;
+  const pw = document.getElementById('adminPass').value;
+  const confirm = document.getElementById('regConfirmPass').value;
+  const hint = document.getElementById('pwHint');
+  if(!pw){ hint.textContent = 'At least 6 characters.'; hint.style.color = 'var(--text-dim)'; return; }
+  const strong = pw.length >= 10 && /[0-9]/.test(pw) && /[a-zA-Z]/.test(pw);
+  const ok = pw.length >= 6;
+  if(confirm && pw !== confirm){
+    hint.textContent = 'Passwords don\'t match yet.';
+    hint.style.color = 'var(--amber)';
+  } else if(!ok){
+    hint.textContent = 'At least 6 characters.';
+    hint.style.color = 'var(--amber)';
+  } else {
+    hint.textContent = strong ? 'Strong password.' : 'Good — could be stronger with a number and more length.';
+    hint.style.color = 'var(--green)';
+  }
+}
+
+async function adminLogin(btn){
+  const username = document.getElementById('adminUser').value.trim();
+  const password = document.getElementById('adminPass').value;
+  const errEl = document.getElementById('adminError');
+  errEl.style.display = 'none';
+
+  if(authMode === 'register'){
+    const confirm = document.getElementById('regConfirmPass').value;
+    if(password !== confirm){
+      errEl.textContent = "Passwords don't match.";
+      errEl.style.display = 'block';
+      return;
+    }
+  }
+
+  const path = authMode === 'register' ? '/auth/register' : '/auth/login';
+  const body = authMode === 'register'
+    ? {username, password, full_name: document.getElementById('regFullName').value.trim(), role: document.getElementById('regRole').value}
+    : {username, password};
+
+  if(btn) btn.classList.add('is-loading');
+  try{
+    const r = await apiFetch(path, {method:'POST', body: JSON.stringify(body)});
+    adminToken = r.access_token;
+    adminAuthed = true;
+    document.getElementById('adminGate').style.display = 'none';
+    document.getElementById('adminDashboard').style.display = 'block';
+    loadAdminProfile();
+    refreshAdmin();
+    if(adminInterval) clearInterval(adminInterval);
+    adminInterval = setInterval(refreshAdmin, 5000);
+  }catch(e){
+    // Show the backend's real reason (e.g. "That username is already
+    // taken") when we have one; only fall back to a generic message for
+    // actual connection failures (no status code at all).
+    if(e.status){
+      errEl.textContent = e.message;
+    } else {
+      errEl.textContent = 'Could not reach the backend. Make sure it\'s running (uvicorn app.main:app --reload).';
+    }
+    errEl.style.display = 'block';
+  }finally{
+    if(btn) btn.classList.remove('is-loading');
+  }
+}
+
+function adminSessionExpired(){
+  adminAuthed = false;
+  adminToken = null;
+  if(adminInterval) clearInterval(adminInterval);
+  document.getElementById('adminDashboard').style.display = 'none';
+  document.getElementById('adminGate').style.display = 'block';
+  document.getElementById('adminError').textContent = 'Session expired — please sign in again.';
+  document.getElementById('adminError').style.display = 'block';
+}
+
+async function loadAdminProfile(){
+  try{
+    const p = await apiFetch('/auth/me', {}, true);
+    document.getElementById('adminWhoAmI').textContent = p.full_name || p.username;
+    document.getElementById('adminRoleLabel').textContent = p.role;
+  }catch(e){ /* non-critical, dashboard still works without this */ }
+}
+
+function adminLogout(){
+  adminAuthed = false;
+  adminToken = null;
+  if(adminInterval) clearInterval(adminInterval);
+
+  // Clear the login form so the next person doesn't see the previous
+  // person's typed username/password.
+  document.getElementById('adminUser').value = '';
+  document.getElementById('adminPass').value = '';
+  const confirmEl = document.getElementById('regConfirmPass');
+  if(confirmEl) confirmEl.value = '';
+  document.getElementById('adminError').style.display = 'none';
+
+  // Always return to the plain sign-in form on logout, not whatever mode
+  // (login/register) was last open.
+  if(authMode !== 'login'){
+    authMode = 'register'; // toggleAuthMode flips it, so set opposite first
+    toggleAuthMode({preventDefault(){}});
+  }
+
+  document.getElementById('adminDashboard').style.display = 'none';
+  document.getElementById('adminGate').style.display = 'block';
+}
+
+async function refreshAdmin(){
+  try{
+    const [entries, doctors] = await Promise.all([
+      apiFetch('/queue/', {}, true),
+      apiFetch('/doctors/')
+    ]);
+    renderAdminQueue(entries);
+    renderAdminDoctors(doctors);
+    setConnBadge(true);
+  }catch(e){
+    setConnBadge(false);
+  }
+}
+
+function renderAdminQueue(entries){
+  const body = document.getElementById('adminQueueBody');
+  if(entries.length === 0){
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-dim); padding:24px;">No patients in queue.</td></tr>';
+    return;
+  }
+  body.innerHTML = entries.map(e => `
+    <tr>
+      <td><b>${e.token}</b></td>
+      <td>${e.patient.name}</td>
+      <td>${e.patient.appointment_type}</td>
+      <td>${Math.round(e.estimated_wait_minutes)} min</td>
+      <td><span class="pill ${e.status}">${e.status.replace('_',' ')}</span></td>
+      <td>
+        ${e.status !== 'in_consultation' ? `<button class="smallbtn" onclick="setStatus('${e.token}','in_consultation')">Call in</button>` : `<button class="smallbtn" onclick="setStatus('${e.token}','done')">Mark done</button>`}
+        <button class="smallbtn" onclick="setStatus('${e.token}','cancelled')">Cancel</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderAdminDoctors(doctors){
+  const el = document.getElementById('adminDoctors');
+  el.innerHTML = doctors.map(d => `
+    <div class="doctor-row">
+      <div>
+        <div style="font-weight:600; font-size:0.9rem;">${d.name}</div>
+        <div style="color:var(--text-dim); font-size:0.78rem;">${d.specialty}</div>
+      </div>
+      <button class="switch ${d.is_available ? 'on' : ''}" onclick="toggleDoctor(${d.id}, ${!d.is_available})"></button>
+    </div>
+  `).join('');
+}
+
+async function setStatus(token, status){
+  try{ await apiFetch(`/queue/${token}/status?status=${status}`, {method:'PATCH'}, true); refreshAdmin(); }
+  catch(e){ alert('Could not update status — is the backend running?'); }
+}
+
+async function toggleDoctor(id, makeAvailable){
+  try{ await apiFetch(`/doctors/${id}/availability?is_available=${makeAvailable}`, {method:'PATCH'}, true); refreshAdmin(); }
+  catch(e){ alert('Could not update doctor — is the backend running?'); }
+}
+
+pingBackend();
+connectQueueSocket();
+</script>
+
+</body>
+</html>

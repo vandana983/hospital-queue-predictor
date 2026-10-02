@@ -1,0 +1,13 @@
+# Render Blueprint. Either use this via "New + > Blueprint" pointing at
+# your repo, or skip it and create a Web Service manually in the dashboard
+# with the same settings (see docs/DEPLOYMENT.md).
+services:
+  - type: web
+    name: queuesense-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true   # Render generates and stores a real secret for you
